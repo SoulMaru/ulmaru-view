@@ -108,6 +108,14 @@ try {
         $offset = [math]::Abs($buttonCenter - $windowCenter)
         Check 'X 화면 중앙 상단 배치' ($offset -le 40 -and ($box.Top - $windowRect.Top) -le 80) ('center_offset=' + $offset + ' top_gap=' + ($box.Top - $windowRect.Top))
     }
+    [void][PlayerWin]::SetCursorPos($centerX, $centerY)
+    Start-Sleep -Milliseconds 800
+    $awayButton = FindButton $window '✕'
+    $awayHidden = ($null -eq $awayButton) -or $awayButton.Current.IsOffscreen
+    Check '상단 벗어나면 X 숨김' $awayHidden ('found=' + ($null -ne $awayButton) + ' offscreen=' + ($null -ne $awayButton -and $awayButton.Current.IsOffscreen))
+    [void][PlayerWin]::SetCursorPos($centerX, $top)
+    Start-Sleep -Milliseconds 600
+    $exitButton = FindButton $window '✕'
 
     if ($null -ne $exitButton) {
         $pattern = $exitButton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
