@@ -85,6 +85,8 @@ ULMARU_MEDIA_ROOT="/mnt/c/AI_RUNTIME_PC1/04_CONTENT_STUDIO" npm start
 | `public/app.js` | 목록·재생·휠 볼륨·전체화면·키보드 |
 | `test/*.test.mjs` | 순수 로직·HTTP·정적 계약 시험 |
 | `tools/smoke.mjs` | 실제 Chromium 스모크(선택, playwright-core 필요) |
+| `windows-player/` | Windows 네이티브 플레이어(얼마루미디어) WPF 소스·빌드·시험 |
+| `assets/eolmaru-video-baby.ico` | Windows 플레이어 아이콘 |
 
 ## 시험
 
@@ -94,6 +96,16 @@ node tools/smoke.mjs --root "/mnt/c/AI_RUNTIME_PC1/04_CONTENT_STUDIO/AUDIO/업�
 ```
 
 스모크는 다음을 확인합니다: WebGL 없이도 동작하는 목록·재생, 휠 볼륨 ±5, `Enter` 전체화면, 상단 X 표시·클릭 종료, `Esc` 종료, 브라우저 콘솔 오류 0.
+
+## Windows 플레이어
+
+브라우저 뷰어와 같은 조작을 Windows 네이티브 앱(`얼마루미디어.exe`)에서도 쓸 수 있습니다. WPF(.NET Framework 4.0) 단일 창이며, 휠 볼륨 ±5(화면 표시 없음), `Enter`/`F` 전체화면, 전체화면 상단 중앙의 배경 없는 ✕, `Esc` 종료를 지원합니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\windows-player\build-media.ps1 -Output .\windows-player\MediaPlayer.exe
+```
+
+빌드·시험·배포 방법은 [`windows-player/README.md`](windows-player/README.md)를 참고하세요.
 
 ## 보안 경계
 
