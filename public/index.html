@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="얼마루 로컬 미디어 뷰어">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>얼마루 뷰 · 로컬 미디어</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">◐</span>
+        <div>
+          <h1>ULMARU VIEW</h1>
+          <p>얼마루 로컬 미디어</p>
+        </div>
+      </div>
+      <div class="top-meta">
+        <span class="chip" id="total-chip">미디어 …</span>
+        <button type="button" id="refresh" title="미디어 폴더를 다시 읽습니다">새로고침</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <aside class="library" aria-label="미디어 목록">
+        <label class="search">
+          <span>검색</span>
+          <input id="search" type="search" placeholder="이름 · 폴더" autocomplete="off">
+        </label>
+
+        <div class="filters" id="filters" role="group" aria-label="미디어 종류">
+          <button type="button" data-kind="" aria-pressed="true">전체 <b id="count-all">0</b></button>
+          <button type="button" data-kind="video" aria-pressed="false">영상 <b id="count-video">0</b></button>
+          <button type="button" data-kind="audio" aria-pressed="false">오디오 <b id="count-audio">0</b></button>
+          <button type="button" data-kind="image" aria-pressed="false">이미지 <b id="count-image">0</b></button>
+        </div>
+
+        <p class="root" id="root-path">미디어 폴더 확인 중…</p>
+        <ol class="media-list" id="media-list" aria-live="polite"></ol>
+        <button type="button" class="more" id="load-more" hidden>더 보기</button>
+      </aside>
+
+      <section class="stage" id="stage" tabindex="0" aria-label="미디어 재생 화면. 휠로 볼륨을 5씩 조절하고, Enter로 전체화면, Esc로 전체화면을 종료합니다.">
+        <div class="fs-bar" id="fs-bar" aria-hidden="true">
+          <span class="fs-title" id="fs-title">전체화면</span>
+          <button type="button" class="fs-exit" id="fs-exit" aria-label="전체화면 종료" title="전체화면 종료 (Esc)">×</button>
+        </div>
+
+        <div class="now" id="now-playing" hidden>
+          <strong id="now-title"></strong>
+          <span id="now-meta"></span>
+        </div>
+
+        <div class="empty" id="empty">
+          <p class="empty-mark" aria-hidden="true">◐</p>
+          <h2>재생할 미디어를 고르세요</h2>
+          <p>왼쪽 목록에서 영상·오디오·이미지를 선택합니다.</p>
+          <p class="hint">휠: 볼륨 ±5 · Enter: 전체화면 · Esc: 전체화면 종료</p>
+        </div>
+
+        <video id="video" class="media" playsinline preload="metadata" hidden></video>
+        <audio id="audio" class="media" preload="metadata" hidden></audio>
+        <img id="image" class="media image" alt="" hidden>
+        <div class="audio-card" id="audio-card" hidden>
+          <div class="disc" id="disc" aria-hidden="true">♪</div>
+          <p id="audio-name">오디오</p>
+        </div>
+
+        <div class="controls" id="controls" hidden>
+          <button type="button" id="play" aria-label="재생">▶</button>
+          <span class="time" id="time">0:00</span>
+          <input id="seek" type="range" min="0" max="1000" step="1" value="0" aria-label="재생 위치">
+          <span class="time" id="duration">0:00</span>
+          <button type="button" id="mute" aria-label="음소거">🔊</button>
+          <input id="volume" type="range" min="0" max="100" step="5" value="80" aria-label="볼륨">
+          <span class="volume-value" id="volume-value">80%</span>
+          <button type="button" id="fullscreen" aria-label="전체화면" aria-pressed="false">⛶</button>
+        </div>
+
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <span>로컬 전용 · 127.0.0.1</span>
+      <span>휠 볼륨 ±5 · Enter 전체화면 · Esc 종료 · Space 재생/일시정지</span>
+    </footer>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
