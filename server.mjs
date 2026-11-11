@@ -8,7 +8,8 @@
 
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { extname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { homedir } from 'node:os';
@@ -22,7 +23,10 @@ const HERE = fileURLToPath(new URL('.', import.meta.url));
 const PUBLIC_DIR = join(HERE, 'public');
 const DEFAULT_PORT = 8793;
 const DEFAULT_HOST = '127.0.0.1';
-const INDEX_TTL = 30_000;
+const INDEX_TTL = 60_000;
+// 색인 캐시는 미디어 폴더가 아니라 사용자 캐시 폴더에 둔다(재시작해도 바로 뜬다).
+const CACHE_DIR = process.env.ULMARU_CACHE_DIR || join(homedir(), '.cache', 'ulmaru-view');
+const CACHE_VERSION = 1;
 
 const STATIC = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
@@ -101,19 +105,85 @@ function parseRange(header, size) {
   return { start, end };
 }
 
-export function createApp({ root = process.cwd(), publicDir = PUBLIC_DIR, ttl = INDEX_TTL } = {}) {
+export function createApp({
+  root = process.cwd(),
+  publicDir = PUBLIC_DIR,
+  ttl = INDEX_TTL,
+  cacheDir = CACHE_DIR,
+} = {}) {
   let cache = null;
   let cacheAt = 0;
   let pending = null;
+  let diskChecked = false;
 
-  async function getIndex(refresh = false) {
-    const now = Date.now();
-    if (!refresh && cache && now - cacheAt < ttl) return cache;
+  const cacheFile = cacheDir
+    ? join(cacheDir, `${createHash('sha1').update(resolve(root)).digest('hex').slice(0, 16)}.json`)
+    : null;
+
+  async function readDiskCache() {
+    if (!cacheFile) return null;
+    try {
+      const data = JSON.parse(await readFile(cacheFile, 'utf8'));
+      if (data?.version !== CACHE_VERSION || data.root !== resolve(root) || !Array.isArray(data.items)) return null;
+      const counts = { video: 0, audio: 0, image: 0 };
+      for (const item of data.items) if (counts[item.kind] !== undefined) counts[item.kind] += 1;
+      return {
+        root: data.root,
+        items: data.items,
+        total: data.items.length,
+        counts,
+        truncated: Boolean(data.truncated),
+        scannedAt: Number(data.scannedAt) || 0,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async function writeDiskCache(index) {
+    if (!cacheFile) return;
+    const body = JSON.stringify({
+      version: CACHE_VERSION,
+      root: index.root,
+      scannedAt: index.scannedAt,
+      truncated: index.truncated,
+      items: index.items,
+    });
+    const temp = `${cacheFile}.${process.pid}.tmp`;
+    try {
+      await mkdir(cacheDir, { recursive: true });
+      await writeFile(temp, body, 'utf8');
+      await rename(temp, cacheFile);
+    } catch {
+      await unlink(temp).catch(() => {});
+    }
+  }
+
+  function startScan() {
     if (pending) return pending;
     pending = scanMedia(root)
-      .then((index) => { cache = index; cacheAt = Date.now(); return index; })
+      .then(async (index) => {
+        cache = index;
+        cacheAt = Date.now();
+        await writeDiskCache(index);
+        return index;
+      })
       .finally(() => { pending = null; });
     return pending;
+  }
+
+  // 캐시가 있으면 낡았더라도 바로 돌려주고, 뒤에서 새로 읽는다(느린 드라이브 대비).
+  async function getIndex(refresh = false) {
+    if (!diskChecked) {
+      diskChecked = true;
+      const disk = await readDiskCache();
+      if (disk) { cache = disk; cacheAt = disk.scannedAt; }
+    }
+    const now = Date.now();
+    if (refresh) return startScan();
+    if (!cache) return startScan();
+    if (now - cacheAt >= ttl) startScan().catch(() => {});
+    return cache;
   }
 
   async function serveStatic(req, res, pathname) {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -16,9 +16,9 @@ async function fixture() {
   return dir;
 }
 
-async function withServer(fn) {
+async function withServer(fn, options = {}) {
   const root = await fixture();
-  const server = createApp({ root });
+  const server = createApp({ root, cacheDir: false, ...options });
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
@@ -109,6 +109,42 @@ test('정적: 화면·스크립트·볼륨 모듈을 제공하고 쓰기 메서�
     const post = await fetch(`${base}/api/state`, { method: 'POST' });
     assert.equal(post.status, 405);
   });
+});
+
+test('캐시: 재시작하면 디스크 색인을 바로 쓰고, 새로고침은 다시 읽는다', async () => {
+  const root = await fixture();
+  const cacheDir = await mkdtemp(join(tmpdir(), 'ulmaru-view-cache-'));
+  const open = async () => {
+    const server = createApp({ root, cacheDir });
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    return { server, base: `http://127.0.0.1:${server.address().port}` };
+  };
+  try {
+    const first = await open();
+    const before = await (await fetch(`${first.base}/api/state`)).json();
+    assert.equal(before.total, 3);
+    await new Promise((resolve) => first.server.close(resolve));
+
+    const files = await readdir(cacheDir);
+    assert.equal(files.filter((name) => name.endsWith('.json')).length, 1, '색인 파일이 하나 생긴다');
+
+    // 파일을 지운 뒤에도 캐시가 있으면 즉시 이전 목록을 준다.
+    await rm(join(root, 'clip.mp4'));
+    const second = await open();
+    const stale = await (await fetch(`${second.base}/api/state`)).json();
+    assert.equal(stale.total, 3);
+
+    const refreshed = await (await fetch(`${second.base}/api/state?refresh=1`)).json();
+    assert.equal(refreshed.total, 2);
+    assert.deepEqual(refreshed.counts, { video: 0, audio: 1, image: 1 });
+    await new Promise((resolve) => second.server.close(resolve));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(cacheDir, { recursive: true, force: true });
+  }
 });
 
 test('보안: 심볼릭 링크가 아닌 정상 파일만 스트리밍한다', async () => {
