@@ -65,13 +65,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\windows-player\tests\playe
 | `Adkiller Media Player\EolmaruMedia.exe` | 영문 별칭 |
 | `readers-framework\MediaPlayer.engine.exe` | 내부 실행 엔진 |
 
-배포 전에 기존 exe를 `backups/`에 백업하고, 복사 후 SHA-256이 네 파일 모두 같은지 확인합니다.
+배포는 `deploy.ps1`로 한 번에 합니다. 기존 exe를 `backups/player-deploy-<시각>/`에 백업하고, 네 곳에 복사한 뒤 SHA-256 일치와 Mark of the Web 제거까지 확인합니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\windows-player\deploy.ps1 `
+  -Build .\windows-player\MediaPlayer.exe
+```
 
 ## SmartScreen 참고
 
-- 배포 exe에는 **Mark of the Web(Zone.Identifier)이 없습니다.**
-- 코드 서명은 하지 않았습니다(`NotSigned`). 서명 인증서가 없으면 게시자 확인 경고가 남을 수 있습니다.
-- 로컬 사용자 설정에서 SmartScreen 앱 검사를 끈 상태입니다:
+- Windows는 zip·다운로드에서 풀린 exe에 **Mark of the Web**(`Zone.Identifier`, `ZoneId=3`)을 남깁니다. 이 표시가 있는 서명 없는 앱은 "Windows의 PC 보호" 경고를 띄울 수 있습니다.
+- `deploy.ps1`은 배포한 네 파일에서 `Zone.Identifier` 스트림을 제거하고, 네 파일의 SHA-256이 모두 같은지 확인한 뒤 `RESULT PASS`를 출력합니다.
+- 코드 서명은 하지 않았습니다(`NotSigned`). 다른 PC로 옮길 때는 zip으로 압축하면 Mark of the Web이 다시 붙을 수 있으니, 옮긴 뒤 `Unblock-File`로 한 번 더 지우세요.
+- 로컬 사용자 설정에서도 SmartScreen 앱 검사를 꺼 두었습니다:
   - `HKCU\Software\Microsoft\Windows\CurrentVersion\AppHost\EnableWebContentEvaluation = 0`
   - `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\SmartScreenEnabled = Off`
 - 위 설정을 되돌리려면 각 값을 지우거나 `EnableWebContentEvaluation=1`, `SmartScreenEnabled=Warn`으로 바꿉니다.
@@ -85,3 +91,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\windows-player\tests\playe
 | `build-media.ps1` | csc 빌드 스크립트 |
 | `tests/PlayerFeatureCheck.cs` | 인프로세스 UI 시험 |
 | `tests/player-live-check.ps1` | 배포 exe UI 자동화 시험 |
+| `deploy.ps1` | 네 위치 배포·백업·해시 확인·Mark of the Web 제거 |

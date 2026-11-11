@@ -38,6 +38,24 @@ function IsFullScreen([IntPtr]$handle) {
     $tall = ($rect.Bottom - $rect.Top) -ge ($bounds.Height - 8)
     return ($wide -and $tall -and $rect.Left -le 2 -and $rect.Top -le 2)
 }
+function Activate-Window([IntPtr]$handle, [int]$x, [int]$y) {
+    [void][PlayerWin]::SetForegroundWindow($handle)
+    try { [Microsoft.VisualBasic.Interaction]::AppActivate($handle) } catch { }
+    [void][PlayerWin]::SetCursorPos($x, $y)
+    Start-Sleep -Milliseconds 150
+    [PlayerWin]::mouse_event(0x0002, 0, 0, 0, [IntPtr]::Zero)
+    [PlayerWin]::mouse_event(0x0004, 0, 0, 0, [IntPtr]::Zero)
+    Start-Sleep -Milliseconds 300
+}
+function Enter-Fullscreen([IntPtr]$handle, [int]$x, [int]$y) {
+    for ($try = 0; $try -lt 3; $try++) {
+        Activate-Window $handle $x $y
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        Start-Sleep -Milliseconds 900
+        if (IsFullScreen $handle) { return $true }
+    }
+    return $false
+}
 function FindButton($root, [string]$name) {
     $type = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Button)
     $label = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, $name)
@@ -90,10 +108,9 @@ try {
     Check '휠 내려도 볼륨 표시 없음' ($seenDown -eq '') ('보인 표시=' + $seenDown)
     Check '휠 조절 후 창 정상' (-not $process.HasExited) ('hasExited=' + $process.HasExited)
 
-    [void][PlayerWin]::SetCursorPos($centerX, $centerY)
-    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-    Start-Sleep -Milliseconds 900
-    Check 'Enter 전체화면' (IsFullScreen $handle) ('rect=' + (Rect $handle).Left + ',' + (Rect $handle).Top + ',' + (Rect $handle).Right + ',' + (Rect $handle).Bottom)
+    $entered = Enter-Fullscreen $handle $centerX $centerY
+    $rectNow = Rect $handle
+    Check 'Enter 전체화면' $entered ('rect=' + $rectNow.Left + ',' + $rectNow.Top + ',' + $rectNow.Right + ',' + $rectNow.Bottom)
 
     $top = (Rect $handle).Top + 12
     [void][PlayerWin]::SetCursorPos($centerX, $top)
@@ -131,10 +148,7 @@ try {
         Check 'X 클릭 종료' $false 'X 버튼 없음'
     }
 
-    [void][PlayerWin]::SetForegroundWindow($handle)
-    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-    Start-Sleep -Milliseconds 900
-    $enteredAgain = IsFullScreen $handle
+    $enteredAgain = Enter-Fullscreen $handle $centerX $centerY
     Check 'Enter 재진입' $enteredAgain ('fullscreen=' + $enteredAgain)
     [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
     Start-Sleep -Milliseconds 900
