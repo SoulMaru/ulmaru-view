@@ -1,0 +1,15 @@
+{
+  "name": "ulmaru-view",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "얼마루 로컬 미디어 뷰어 — 마우스 휠 볼륨(5 단위), 전체화면 상단 X, Enter/Esc 전체화면",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test"
+  },
+  "license": "UNLICENSED"
+}
