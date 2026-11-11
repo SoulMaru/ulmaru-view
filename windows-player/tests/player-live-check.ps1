@@ -118,10 +118,15 @@ try {
     $exitButton = FindButton $window '✕'
 
     if ($null -ne $exitButton) {
-        $pattern = $exitButton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
-        $pattern.Invoke()
-        Start-Sleep -Milliseconds 900
-        Check 'X 클릭 종료' (-not (IsFullScreen $handle)) ('rect=' + (Rect $handle).Left + ',' + (Rect $handle).Top)
+        $clickBox = $exitButton.Current.BoundingRectangle
+        $clickX = [int](($clickBox.Left + $clickBox.Right) / 2)
+        $clickY = [int](($clickBox.Top + $clickBox.Bottom) / 2)
+        [void][PlayerWin]::SetCursorPos($clickX, $clickY)
+        Start-Sleep -Milliseconds 250
+        [PlayerWin]::mouse_event(0x0002, 0, 0, 0, [IntPtr]::Zero)
+        [PlayerWin]::mouse_event(0x0004, 0, 0, 0, [IntPtr]::Zero)
+        Start-Sleep -Milliseconds 1000
+        Check 'X 실제 클릭 종료' (-not (IsFullScreen $handle)) ('click=' + $clickX + ',' + $clickY + ' rect=' + (Rect $handle).Left + ',' + (Rect $handle).Top)
     } else {
         Check 'X 클릭 종료' $false 'X 버튼 없음'
     }
