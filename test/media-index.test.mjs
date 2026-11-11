@@ -108,6 +108,11 @@ test('탐색: 하위 폴더의 미디어만 모으고 숨김·node_modules는 �
     const limited = await scanMedia(dir, { limit: 2 });
     assert.equal(limited.total, 2);
     assert.equal(limited.truncated, true);
+
+    // 병렬 stat으로 읽어도 순서·개수가 같다.
+    const parallel = await scanMedia(dir, { concurrency: 2 });
+    assert.deepEqual(parallel.items.map((item) => item.name), index.items.map((item) => item.name));
+    assert.deepEqual(parallel.counts, index.counts);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

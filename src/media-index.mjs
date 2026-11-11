@@ -65,11 +65,29 @@ export function folderOf(relPath) {
   return parts.join('/');
 }
 
+export const SCAN_CONCURRENCY = 32;
+
+// 정해진 개수만큼 동시에 실행한다. 네트워크 드라이브(9p/SMB)에서 stat 지연을 겹친다.
+async function mapPool(list, limit, fn) {
+  const results = new Array(list.length);
+  let next = 0;
+  const size = Math.max(1, Math.min(Math.floor(Number(limit) || 1), list.length || 1));
+  const workers = Array.from({ length: size }, async () => {
+    for (;;) {
+      const index = next;
+      next += 1;
+      if (index >= list.length) return;
+      results[index] = await fn(list[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 // root 아래의 미디어 파일을 재귀 탐색한다. 심볼릭 링크는 따라가지 않는다.
-export async function scanMedia(root, { limit = MAX_FILES } = {}) {
+export async function scanMedia(root, { limit = MAX_FILES, concurrency = SCAN_CONCURRENCY } = {}) {
   const base = resolve(String(root || '.'));
-  const items = [];
-  let visited = 0;
+  const found = [];
   let truncated = false;
   const stack = [''];
   while (stack.length) {
@@ -91,26 +109,37 @@ export async function scanMedia(root, { limit = MAX_FILES } = {}) {
       if (!entry.isFile()) continue;
       const kind = kindOf(entry.name);
       if (!kind) continue;
-      visited += 1;
-      if (visited > limit) { truncated = true; break; }
-      let info;
-      try {
-        info = await stat(join(base, rel));
-      } catch {
-        continue;
-      }
-      items.push({
-        id: mediaId(rel),
-        rel,
-        name: entry.name,
-        folder: folderOf(rel),
-        ext: extname(entry.name).slice(1).toLowerCase(),
-        kind,
-        size: info.size,
-        mtime: Math.round(info.mtimeMs),
-      });
+      found.push({ rel, name: entry.name, kind });
+      if (found.length > limit) { truncated = true; break; }
     }
     if (truncated) break;
+  }
+  if (truncated) found.length = limit;
+
+  // stat은 병렬로. 읽는 도중 사라진 파일은 건너뛴다.
+  const infos = await mapPool(found, concurrency, async (file) => {
+    try {
+      return await stat(join(base, file.rel));
+    } catch {
+      return null;
+    }
+  });
+
+  const items = [];
+  for (let index = 0; index < found.length; index += 1) {
+    const info = infos[index];
+    if (!info) continue;
+    const { rel, name, kind } = found[index];
+    items.push({
+      id: mediaId(rel),
+      rel,
+      name,
+      folder: folderOf(rel),
+      ext: extname(name).slice(1).toLowerCase(),
+      kind,
+      size: info.size,
+      mtime: Math.round(info.mtimeMs),
+    });
   }
   items.sort((a, b) => b.mtime - a.mtime || a.rel.localeCompare(b.rel, 'ko'));
   const counts = { video: 0, audio: 0, image: 0 };
